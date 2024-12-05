@@ -50,37 +50,6 @@ fn part_1_count_safe(reports: &Reports) -> usize {
         .count()
 }
 
-fn part_2_count_dampened_safe(reports: &Reports) -> usize {
-    reports
-        .nums
-        .iter()
-        .filter_map(|levels| {
-            if levels
-                .windows(2)
-                .map(|x| TryInto::<&[u8; 2]>::try_into(x).unwrap())
-                .fold((None, 0), |(acc_ord, acc_cnt), &[x, y]| {
-                    // TODO: Doesn't work if the first item should be discarded
-                    if y < x && acc_ord.is_none_or(|ord| ord == Ordering::Less) && x - y <= 3 {
-                        (Some(Ordering::Less), acc_cnt + 1)
-                    } else if y > x
-                        && acc_ord.is_none_or(|ord| ord == Ordering::Greater && y - x <= 3)
-                    {
-                        (Some(Ordering::Greater), acc_cnt + 1)
-                    } else {
-                        (acc_ord, acc_cnt)
-                    }
-                })
-                .1
-                >= levels.len() - 1
-            {
-                Some(())
-            } else {
-                None
-            }
-        })
-        .count()
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let input = fs::read_to_string("input.txt")?;
     let reports = input.parse()?;
@@ -103,11 +72,5 @@ mod tests {
     fn it_passes_testcase_1() {
         let reports = TEST_INPUT.parse::<Reports>().unwrap();
         assert_eq!(2, part_1_count_safe(&reports));
-    }
-
-    #[test]
-    fn it_passes_testcase_2() {
-        let reports = TEST_INPUT.parse::<Reports>().unwrap();
-        assert_eq!(4, part_2_count_dampened_safe(&reports));
     }
 }
