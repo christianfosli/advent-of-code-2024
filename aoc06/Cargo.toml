@@ -1,0 +1,7 @@
+[package]
+name = "aoc06"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rotate-enum = "0.1.2"
