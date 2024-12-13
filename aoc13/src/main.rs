@@ -1,29 +1,21 @@
 use std::{error::Error, fs, str::FromStr};
 
+use good_lp::{constraint, default_solver, variables, Solution, SolverModel};
 use regex::Regex;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum Button {
-    A(u32, u32),
-    B(u32, u32),
+struct Point {
+    x: u32,
+    y: u32,
 }
 
-impl Button {
-    fn cost(self) -> u32 {
-        match self {
-            Button::A(_, _) => 1,
-            Button::B(_, _) => 3,
-        }
-    }
+struct ClawMachineProblem {
+    btn_a: Point,
+    btn_b: Point,
+    prize: Point,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct ClawMachine {
-    buttons: (Button, Button),
-    prize: (u32, u32),
-}
-
-impl FromStr for ClawMachine {
+impl FromStr for ClawMachineProblem {
     type Err = Box<dyn Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -33,44 +25,80 @@ impl FromStr for ClawMachine {
         let re_caps_a = Regex::new(r"Button A: X\+(\d+), Y\+(\d+)")?
             .captures(str_a)
             .unwrap();
-        let btn_a = Button::A(re_caps_a[1].parse::<u32>()?, re_caps_a[2].parse::<u32>()?);
+        let btn_a = Point {
+            x: re_caps_a[1].parse::<u32>()?,
+            y: re_caps_a[2].parse::<u32>()?,
+        };
 
         let str_b = lines_iter.next().unwrap();
         let re_caps_b = Regex::new(r"Button B: X\+(\d+), Y\+(\d+)")?
             .captures(str_b)
             .unwrap();
-        let btn_b = Button::B(re_caps_b[1].parse::<u32>()?, re_caps_b[2].parse::<u32>()?);
+        let btn_b = Point {
+            x: re_caps_b[1].parse::<u32>()?,
+            y: re_caps_b[2].parse::<u32>()?,
+        };
 
         let str_prize = lines_iter.next().unwrap();
         let re_caps_p = Regex::new(r"Prize: X=(\d+), Y=(\d+)")?
             .captures(str_prize)
             .unwrap();
-        let prize = (re_caps_p[1].parse::<u32>()?, re_caps_p[2].parse::<u32>()?);
+        let prize = Point {
+            x: re_caps_p[1].parse::<u32>()?,
+            y: re_caps_p[2].parse::<u32>()?,
+        };
 
-        Ok(ClawMachine {
-            buttons: (btn_a, btn_b),
+        Ok(ClawMachineProblem {
+            btn_a,
+            btn_b,
             prize,
         })
     }
 }
 
-fn solve(machine: &ClawMachine) -> Option<usize> {
-    // TODO: Use linear programming to win the price with the least number of tokens or return None if insolvable
-    // See crate good_lp
-    unimplemented!()
+impl ClawMachineProblem {
+    fn solve(&self) -> Option<f64> {
+        variables! { vars:
+            a (integer) <= 100;
+            b (integer) <= 100;
+        }
+
+        let objective = a * 3 + b;
+
+        let result = vars
+            .minimise(&objective)
+            .using(default_solver)
+            .with(constraint!(
+                a * self.btn_a.x + b * self.btn_b.x == self.prize.x
+            ))
+            .with(constraint!(
+                a * self.btn_a.y + b * self.btn_b.y == self.prize.y
+            ))
+            .solve();
+
+        match result {
+            Ok(solution) => Some(solution.eval(&objective)),
+            Err(_) => None,
+        }
+    }
 }
 
-fn min_token_cost_p1(machines: &[ClawMachine]) -> usize {
-    machines.into_iter().filter_map(solve).sum()
+fn min_token_cost_p1(machines: &[ClawMachineProblem]) -> f64 {
+    machines
+        .into_iter()
+        .filter_map(ClawMachineProblem::solve)
+        .sum()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let input = fs::read_to_string("input.txt")?;
     let machines = input
         .split("\n\n")
-        .map(|s| s.parse::<ClawMachine>())
+        .map(|s| s.parse::<ClawMachineProblem>())
         .collect::<Result<Vec<_>, _>>()?;
+
     println!("Part 1: {}", min_token_cost_p1(&machines));
+
     Ok(())
 }
 
@@ -95,13 +123,24 @@ Button B: X+27, Y+71
 Prize: X=18641, Y=10279";
 
     #[test]
+    fn test_solve() {
+        let problem = ClawMachineProblem {
+            btn_a: Point { x: 94, y: 34 },
+            btn_b: Point { x: 22, y: 67 },
+            prize: Point { x: 8400, y: 5400 },
+        };
+
+        assert_eq!(Some(280f64), problem.solve());
+    }
+
+    #[test]
     fn it_passes_testcase_1() {
         let machines = TEST_INPUT
             .split("\n\n")
-            .map(|s| s.parse::<ClawMachine>())
+            .map(|s| s.parse::<ClawMachineProblem>())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        assert_eq!(min_token_cost_p1(&machines), 480)
+        assert_eq!(min_token_cost_p1(&machines), 480f64)
     }
 }
